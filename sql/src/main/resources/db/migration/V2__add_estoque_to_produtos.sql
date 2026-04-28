@@ -1,0 +1,2 @@
+ALTER TABLE produtos
+    ADD COLUMN estoque INT NOT NULL DEFAULT 0;
