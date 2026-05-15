@@ -56,12 +56,6 @@
     </dependencies>
 
     <build>
-        <sourceDirectory>sql/src/main/java</sourceDirectory>
-        <resources>
-            <resource>
-                <directory>sql/src/main/resources</directory>
-            </resource>
-        </resources>
         <plugins>
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
