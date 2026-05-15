@@ -1,50 +1,92 @@
 package sistemapedidos;
 
-import sistemapedidos.config.FlywayConfig;
-import sistemapedidos.entity.Categoria;
-import sistemapedidos.entity.Cliente;
-import sistemapedidos.entity.Pedido;
-import sistemapedidos.entity.Produto;
-import sistemapedidos.repository.CategoriaRepository;
-import sistemapedidos.service.ClienteService;
-import sistemapedidos.service.PedidoService;
-import sistemapedidos.service.ProdutoService;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
+import jakarta.persistence.Persistence;
+import sistemapedidos.configuracao.FlywayConfig;
+import sistemapedidos.entidade.Espetinho;
+import sistemapedidos.entidade.Usuario;
+import sistemapedidos.repositorio.EspetinhoRepository;
+import sistemapedidos.repositorio.UsuarioRepository;
+import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) {
-
         // Executa as migrations do Flyway antes de qualquer operação
         FlywayConfig.migrate();
 
+        EntityManagerFactory emf = null;
+        EntityManager em = null;
         try {
-            // Instancia os services responsáveis pelas regras de negócio
-            ClienteService clienteService = new ClienteService();
-            ProdutoService produtoService = new ProdutoService();
-            PedidoService pedidoService = new PedidoService();
-            CategoriaRepository categoriaRepository = new CategoriaRepository();
+            emf = Persistence.createEntityManagerFactory("meuPU");
+            em = emf.createEntityManager();
 
-            // 1. Criar e salvar categoria (necessária para vincular ao produto)
-            Categoria categoria = new Categoria("Eletrodoméstico");
-            categoriaRepository.salvar(categoria);
-            System.out.println("Categoria salva com sucesso!");
+            UsuarioRepository usuarioRepository = new UsuarioRepository();
+            EspetinhoRepository espetinhoRepository = new EspetinhoRepository();
 
-            // 2. Criar e salvar cliente
-            Cliente cliente = new Cliente("joao", "joaozin@email.com");
-            clienteService.salvar(cliente);
-            System.out.println("Cliente salvo com sucesso!");
+            Scanner sc = new Scanner(System.in);
 
-            // 3. Criar e salvar produto vinculado à categoria
-            Produto produto = new Produto("microondas", 100.0, 10, categoria);
-            produtoService.salvarProduto(produto);
-            System.out.println("Produto salvo com sucesso!");
+            System.out.println("1 - Login | 2 - Registrar");
+            int opcao = sc.nextInt();
+            sc.nextLine();
 
-            // 4. Criar e salvar pedido vinculado ao cliente
-            Pedido pedido = new Pedido(100.0, cliente);
-            pedidoService.salvarPedido(pedido);
-            System.out.println("Pedido salvo com sucesso!");
+            Usuario usuario = null;
+            if (opcao == 1) {
+                System.out.print("Email: ");
+                String email = sc.nextLine();
+                System.out.print("Senha: ");
+                String senha = sc.nextLine();
+                usuario = usuarioRepository.autenticar(email, senha);
+                if (usuario == null) {
+                    System.out.println("Credenciais inválidas!");
+                    return;
+                }
+            } else {
+                Usuario novo = new Usuario();
+                System.out.print("Nome: ");
+                novo.setNome(sc.nextLine());
+                System.out.print("Email: ");
+                novo.setEmail(sc.nextLine());
+                System.out.print("Senha: ");
+                novo.setSenha(sc.nextLine());
+                novo.setChefe(false);
+                usuarioRepository.registrar(novo);
+                System.out.println("Registro concluído!");
+                usuario = novo;
+            }
 
+            System.out.println("Bem-vindo, " + usuario.getNome());
+            espetinhoRepository.listarCardapio();
+
+            double total = 0;
+            System.out.println("Digite o ID do espetinho para comprar (0 para sair):");
+            while (true) {
+                Long id = sc.nextLong();
+                if (id == 0) break;
+                Espetinho e = espetinhoRepository.findById(id);
+                if (e != null && e.getEstoque() > 0) {
+                    total += e.getPreco();
+                    try {
+                        em.getTransaction().begin();
+                        e.setEstoque(e.getEstoque() - 1);
+                        em.merge(e);
+                        em.getTransaction().commit();
+                        System.out.println("Adicionado: " + e.getSabor());
+                    } catch (Exception ex) {
+                        em.getTransaction().rollback();
+                        System.out.println("Erro ao processar compra: " + ex.getMessage());
+                    }
+                } else {
+                    System.out.println("Espetinho indisponível!");
+                }
+            }
+
+            System.out.println("Total da compra: R$ " + total);
         } catch (Exception e) {
             System.out.println("Erro no sistema: " + e.getMessage());
+        } finally {
+            if (em != null) em.close();
+            if (emf != null) emf.close();
         }
     }
 }
